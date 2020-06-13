@@ -21,67 +21,73 @@ def send_to_influx(stats, config):
     from influxdb import InfluxDBClient
     from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
 
-    influx_client = InfluxDBClient(
-        config['INFLUXDB']['host'],
-        config['INFLUXDB']['port'],
-        config['INFLUXDB']['username'],
-        config['INFLUXDB']['password'],
-        config['INFLUXDB']['database'],
-        config['INFLUXDB']['use_ssl'],
-        config['INFLUXDB']['verify_ssl']
-    )
-    modem_model = config['MAIN']['modem_model'].lower()
+    try:
 
-    series = []
-    current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-    logging.debug('Inserting InfluxDb for time %s', current_time)
+        influx_client = InfluxDBClient(
+            config['INFLUXDB']['host'],
+            config['INFLUXDB']['port'],
+            config['INFLUXDB']['username'],
+            config['INFLUXDB']['password'],
+            config['INFLUXDB']['database'],
+            config['INFLUXDB']['use_ssl'],
+            config['INFLUXDB']['verify_ssl']
+        )
+        modem_model = config['MAIN']['modem_model'].lower()
 
-    series.append({
-        'measurement': 'uptime',
-        'time': current_time,
-        'fields': {
-            'uptime': int(stats['uptime']),
-        },
-        'tags': {
-            'modem_model': modem_model
-        }
-    })
+        series = []
+        current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        logging.debug('Inserting InfluxDb for time %s', current_time)
 
-    for stats_down in stats['downstream']:
         series.append({
-            'measurement': 'downstream',
+            'measurement': 'uptime',
             'time': current_time,
             'fields': {
-                'channel_id': int(stats_down['channel_id']),
-                'status': stats_down['status'],
-                'frequency': float(stats_down['frequency']),
-                'power': float(stats_down['power']),
-                'snr': float(stats_down['snr']),
-                'corrected': int(stats_down['corrected']),
-                'uncorrectables': int(stats_down['uncorrectables'])
+                'uptime': int(stats['uptime']),
             },
             'tags': {
-                'channel': int(stats_down['channel']),
                 'modem_model': modem_model
             }
         })
 
-    for stats_up in stats['upstream']:
-        series.append({
-            'measurement': 'upstream',
-            'time': current_time,
-            'fields': {
-                'channel_id': int(stats_up['channel_id']),
-                'status': stats_up['status'],
-                'symbol_rate': int(stats_up['symbol_rate']),
-                'frequency': float(stats_up['frequency']),
-                'power': float(stats_up['power']),
-            },
-            'tags': {
-                'channel': int(stats_up['channel']),
-                'modem_model': modem_model
-            }
-        })
+        for stats_down in stats['downstream']:
+            series.append({
+                'measurement': 'downstream',
+                'time': current_time,
+                'fields': {
+                    'channel_id': int(stats_down['channel_id']),
+                    'status': stats_down['status'],
+                    'frequency': float(stats_down['frequency']),
+                    'power': float(stats_down['power']),
+                    'snr': float(stats_down['snr']),
+                    'corrected': int(stats_down['corrected']),
+                    'uncorrectables': int(stats_down['uncorrectables'])
+                },
+                'tags': {
+                    'channel': int(stats_down['channel']),
+                    'modem_model': modem_model
+                }
+            })
+
+        for stats_up in stats['upstream']:
+            series.append({
+                'measurement': 'upstream',
+                'time': current_time,
+                'fields': {
+                    'channel_id': int(stats_up['channel_id']),
+                    'status': stats_up['status'],
+                    'symbol_rate': int(stats_up['symbol_rate']),
+                    'frequency': float(stats_up['frequency']),
+                    'power': float(stats_up['power']),
+                },
+                'tags': {
+                    'channel': int(stats_up['channel']),
+                    'modem_model': modem_model
+                }
+            })
+    except Exception as exception:
+        logging.error(exception)
+        logging.error('Failed To Parse Data To Write To InfluxDB')
+        return
 
     try:
         influx_client.write_points(series)
